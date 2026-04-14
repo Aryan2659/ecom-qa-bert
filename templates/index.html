@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Commerce QA — BERT + Sentiment</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="app">
+
+    <header class="header">
+        <div class="header-badge">BERT · DistilBERT · Playwright</div>
+        <h1>E-Commerce Product QA</h1>
+        <p class="tagline">Ask spec questions → BERT · Ask review questions → Sentiment · Playwright handles JS-rendered pages</p>
+    </header>
+
+    <div class="main-layout">
+
+        <!-- LEFT: Inputs -->
+        <div class="panel input-panel">
+            <div class="toggle-bar">
+                <button class="toggle-btn active" id="btn-mode-url" data-mode="url">URL</button>
+                <button class="toggle-btn" id="btn-mode-text" data-mode="text">Text</button>
+            </div>
+
+            <div id="mode-url" class="mode-section">
+                <label>Product URL</label>
+                <div class="url-row">
+                    <input type="url" id="input-url" placeholder="https://www.amazon.in/dp/B0CX23V2ZK">
+                    <button class="btn-scrape" id="btn-scrape">Scrape</button>
+                </div>
+                <div class="hint">Amazon / Flipkart / any webpage · reviews scraped when available</div>
+            </div>
+
+            <div id="mode-text" class="mode-section hidden">
+                <label>Product description / context</label>
+                <textarea id="input-context" rows="8" placeholder="Paste product text here..."></textarea>
+            </div>
+
+            <div id="scraped-preview" class="scraped-preview hidden">
+                <div class="scraped-header">
+                    <span class="scraped-badge" id="scraped-source">amazon</span>
+                    <span class="scraped-title" id="scraped-title">Product Title</span>
+                    <button class="btn-clear" id="btn-clear-scraped">Clear</button>
+                </div>
+                <div class="scraped-text" id="scraped-text"></div>
+                <div class="scraped-meta" id="scraped-meta"></div>
+                <div class="scraped-review-meta" id="scraped-review-meta"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <label>Your question</label>
+            <div class="question-row">
+                <input type="text" id="input-question" placeholder="What is the battery capacity? / Are reviews good?">
+                <button class="btn-ask" id="btn-ask">Ask</button>
+            </div>
+
+            <div id="quick-questions" class="quick-questions hidden">
+                <span class="quick-label">Try:</span>
+                <div id="quick-btns" class="quick-btns"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Results -->
+        <div class="panel results-panel">
+            <div id="empty-state" class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.25">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <p>Paste a URL or text, then ask a question</p>
+                <p class="empty-sub">Spec questions use BERT · review questions use sentiment analysis</p>
+            </div>
+
+            <div id="intent-pill" class="intent-pill hidden"></div>
+
+            <!-- QA result (spec questions) -->
+            <div id="answer-section" class="answer-section hidden">
+                <div class="answer-card" id="answer-card">
+                    <div class="answer-label">Extracted Answer</div>
+                    <div class="answer-text" id="answer-text"></div>
+                    <div class="answer-meta">
+                        <div class="meta-item"><span class="meta-label">Confidence</span><span class="meta-value" id="m-conf">—</span></div>
+                        <div class="meta-item"><span class="meta-label">Level</span><span class="confidence-badge" id="m-level">—</span></div>
+                        <div class="meta-item"><span class="meta-label">Time</span><span class="meta-value" id="m-time">—</span></div>
+                        <div class="meta-item"><span class="meta-label">Tokens</span><span class="meta-value" id="m-tokens">—</span></div>
+                    </div>
+                </div>
+
+                <div class="token-section">
+                    <div class="token-header">
+                        <span>Token breakdown</span>
+                        <div class="token-legend">
+                            <span class="leg"><span class="dot dot-q"></span>Question</span>
+                            <span class="leg"><span class="dot dot-c"></span>Context</span>
+                            <span class="leg"><span class="dot dot-a"></span>Answer</span>
+                        </div>
+                    </div>
+                    <div class="token-strip" id="token-strip"></div>
+                </div>
+
+                <div class="highlight-section">
+                    <div class="highlight-header">Answer in context</div>
+                    <div class="highlight-text" id="highlight-text"></div>
+                </div>
+            </div>
+
+            <!-- Sentiment result (review questions) -->
+            <div id="sentiment-section" class="sentiment-section hidden">
+                <div class="sentiment-card" id="sentiment-card">
+                    <div class="sentiment-label">Review Sentiment</div>
+                    <div class="sentiment-verdict" id="sentiment-verdict">—</div>
+
+                    <div class="sentiment-bar">
+                        <div class="sentiment-bar-pos" id="sentiment-bar-pos"></div>
+                        <div class="sentiment-bar-neg" id="sentiment-bar-neg"></div>
+                    </div>
+                    <div class="sentiment-bar-labels">
+                        <span class="pos-pct" id="pos-pct">— positive</span>
+                        <span class="neg-pct" id="neg-pct">— negative</span>
+                    </div>
+
+                    <div class="sentiment-meta">
+                        <div class="meta-item"><span class="meta-label">Reviews</span><span class="meta-value" id="s-total">—</span></div>
+                        <div class="meta-item"><span class="meta-label">Positive</span><span class="meta-value" id="s-pos">—</span></div>
+                        <div class="meta-item"><span class="meta-label">Negative</span><span class="meta-value" id="s-neg">—</span></div>
+                        <div class="meta-item"><span class="meta-label">Time</span><span class="meta-value" id="s-time">—</span></div>
+                    </div>
+                </div>
+
+                <div class="review-samples">
+                    <div class="review-col">
+                        <div class="review-col-header pos">Top positive</div>
+                        <div class="review-list" id="top-positive-list"></div>
+                    </div>
+                    <div class="review-col">
+                        <div class="review-col-header neg">Top negative</div>
+                        <div class="review-list" id="top-negative-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Errors per branch -->
+            <div id="branch-errors" class="branch-errors hidden"></div>
+
+            <div id="history-section" class="history-section">
+                <div class="history-header">
+                    <span>Saved questions</span>
+                    <button class="btn-clear-all" id="btn-clear-history" title="Clear all">Clear all</button>
+                </div>
+                <div id="history-list" class="history-list">
+                    <div class="history-empty">No saved questions yet.</div>
+                </div>
+            </div>
+
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <span id="loading-text">Running inference...</span>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        BERT for specs · DistilBERT-SST for reviews · Playwright for scraping · All answers are grounded in scraped text
+    </footer>
+</div>
+
+<script src="/static/js/main.js"></script>
+</body>
+</html>

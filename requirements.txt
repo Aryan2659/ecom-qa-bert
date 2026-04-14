@@ -1,0 +1,27 @@
+# Pinned versions for reproducible builds.
+# CPU-only torch wheel installed separately in the Dockerfile.
+
+flask==3.0.3
+gunicorn==22.0.0
+flask-limiter==3.8.0
+
+transformers==4.44.2
+tokenizers==0.19.1
+safetensors==0.4.5
+huggingface-hub==0.24.7
+
+numpy==1.26.4
+scikit-learn==1.5.1
+
+beautifulsoup4==4.12.3
+requests==2.32.3
+urllib3==2.2.2
+lxml==5.3.0
+
+# Headless browser for JS-rendered pages (Amazon/Flipkart reviews)
+playwright==1.47.0
+
+python-dotenv==1.0.1
+
+# Dev / tests
+pytest==8.3.2
