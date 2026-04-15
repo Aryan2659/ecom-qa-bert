@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: Multi-model product QA — BERT for specs, DistilBERT for review sentiment
+short_description: Product QA with BERT and sentiment analysis
 ---
 
 # E-Commerce Product QA (v2) — BERT + Sentiment + Playwright
