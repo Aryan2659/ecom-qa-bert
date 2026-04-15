@@ -18,46 +18,23 @@ The **E-Commerce Intelligence Engine** is an end-to-end NLP system designed to b
 ## 🏗️ System Architecture
 The engine follows a modular pipeline designed for low-latency inference and high data integrity:
 
-### 1. Intelligent Intent Routing
-The core logic resides in a rule-based classifier that analyzes the linguistic structure of the user's question:
-* **Technical/Factual:** Questions regarding dimensions, hardware, or compatibility.
-* **Subjective/Opinionated:** Questions regarding user satisfaction, quality, or reliability.
-* **Hybrid Analysis:** Simultaneous execution for complex queries requiring both data points.
-
-### 2. Deep Learning Stack
-| Component | Model | Functional Utility |
-| :--- | :--- | :--- |
-| **Extractive QA** | `deepset/bert-base-cased-squad2` | High-precision extraction of facts from unstructured product descriptions. |
-| **Sentiment Analysis**| `distilbert-base-uncased-finetuned-sst-2` | Statistical aggregation of customer sentiment across 50+ real-time reviews. |
-
----
-
-## 🛠️ Tech Stack
-* **Core Logic:** Python, Flask (RESTful API)
-* **Deep Learning:** Transformers (Hugging Face), PyTorch, BERT
-* **Automation:** Playwright (Chromium), BeautifulSoup4
-* **Reliability:** Docker, SQLite (Query Persistence), UptimeRobot
-
----
-
-## 🚀 Installation & Local Development
-
-### Prerequisites
-* Python 3.9+
-* Docker (optional)
-
-### Setup
-```bash
-# Clone the repository
-git clone [https://github.com/Aryan2659/ecom-qa-bert-v2](https://github.com/Aryan2659/ecom-qa-bert-v2) && cd ecom-qa-bert-v2
-
-# Create Virtual Environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install Dependencies
-pip install -r requirements.txt
-python -m playwright install chromium
-
-# Launch the Application
-python -m src.app
+```text
+                        ┌─────────────────────┐
+        Question ──────▶│    Intent Router    │ ───┐
+                        │   (keyword-based)   │    │
+                        └─────────────────────┘    │
+                                                   │
+                ┌──── "spec" ───┐  "both"    ┌──── "review" ───┐
+                │               │    │       │                 │
+                ▼               ▼    ▼       ▼                 ▼
+        ┌──────────────┐       (both run)          ┌────────────────────┐
+        │   BERT QA    │                           │   DistilBERT-SST   │
+        │ (extractive) │                           │    (sentiment)     │
+        │ from specs + │                           │  batched over all  │
+        │ features     │                           │  scraped reviews   │
+        └──────────────┘                           └────────────────────┘
+              │                                              │
+              ▼                                              ▼
+      Answer span +                                  Overall verdict +
+      confidence +                                   pos/neg % + top 3
+      token breakdown                                positive + top 3 negative
