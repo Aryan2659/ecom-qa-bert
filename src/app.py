@@ -68,6 +68,7 @@ def create_app() -> Flask:
             "qa_model": config.MODEL_NAME,
             "sentiment_model": config.SENTIMENT_MODEL_NAME,
             "playwright_enabled": config.PLAYWRIGHT_ENABLED,
+            "scraperapi_enabled": config.SCRAPERAPI_ENABLED,
         }), 200
 
     @app.post("/api/scrape")

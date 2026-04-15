@@ -29,7 +29,8 @@ USER_AGENTS = [
 
 def scrape_url(url: str) -> dict:
     """
-    Try Playwright first, fall back to legacy requests scraper on failure.
+    Scraping chain: ScraperAPI → Playwright → requests (legacy).
+    First one that returns usable data wins.
     """
     if not url:
         return {"error": "URL is required."}
@@ -38,31 +39,49 @@ def scrape_url(url: str) -> dict:
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
-    if not config.PLAYWRIGHT_ENABLED:
-        logger.info("Playwright disabled; using legacy scraper")
-        result = legacy_scrape_url(url)
-        result["reviews"] = []
-        result["scraper_used"] = "legacy"
-        return result
+    # 1) ScraperAPI (residential proxy) — best chance of avoiding blocks
+    if config.SCRAPERAPI_ENABLED:
+        try:
+            from .scraper_proxy import scrape_with_scraperapi
+            result = scrape_with_scraperapi(url)
+            if not result.get("error"):
+                result["scraper_used"] = "scraperapi"
+                return result
+            logger.warning(f"ScraperAPI failed: {result['error']} — trying Playwright")
+            last_error = result["error"]
+        except Exception as e:
+            logger.exception("ScraperAPI crashed")
+            last_error = f"ScraperAPI crashed: {e}"
+    else:
+        last_error = None
 
+    # 2) Playwright (headless browser)
+    if config.PLAYWRIGHT_ENABLED:
+        try:
+            result = _scrape_with_playwright(url)
+            if not result.get("error"):
+                result["scraper_used"] = "playwright"
+                return result
+            logger.warning(f"Playwright failed: {result['error']} — trying legacy")
+            last_error = result["error"]
+        except Exception as e:
+            logger.exception("Playwright crashed")
+            last_error = f"Playwright crashed: {e}"
+
+    # 3) Legacy requests (last resort)
     try:
-        result = _scrape_with_playwright(url)
-        if result.get("error"):
-            logger.warning(f"Playwright error, legacy fallback: {result['error']}")
-            fallback = legacy_scrape_url(url)
-            fallback["reviews"] = []
-            fallback["scraper_used"] = "legacy-fallback"
-            fallback["playwright_error"] = result["error"]
-            return fallback
-        result["scraper_used"] = "playwright"
-        return result
-    except Exception as e:
-        logger.exception("Playwright crashed")
         fallback = legacy_scrape_url(url)
         fallback["reviews"] = []
-        fallback["scraper_used"] = "legacy-fallback"
-        fallback["playwright_error"] = str(e)
+        fallback["scraper_used"] = "legacy"
+        if last_error:
+            fallback["upstream_error"] = last_error
         return fallback
+    except Exception as e:
+        logger.exception("Legacy scraper crashed")
+        return {
+            "error": f"All scrapers failed. Last error: {last_error or e}",
+            "scraper_used": "none",
+        }
 
 
 def _scrape_with_playwright(url: str) -> dict:

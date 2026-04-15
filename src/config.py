@@ -35,6 +35,13 @@ SENTIMENT_BATCH_SIZE = int(os.getenv("SENTIMENT_BATCH_SIZE", "8"))
 SCRAPE_TIMEOUT = int(os.getenv("SCRAPE_TIMEOUT", "25"))
 SCRAPE_MAX_RETRIES = int(os.getenv("SCRAPE_MAX_RETRIES", "3"))
 
+# ScraperAPI (residential proxy service) — primary scraping path
+# Sign up at scraperapi.com for a free 1000 req/month key
+SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "")
+SCRAPERAPI_ENABLED = _bool(os.getenv("SCRAPERAPI_ENABLED"), default=True) and bool(SCRAPERAPI_KEY)
+SCRAPERAPI_TIMEOUT = int(os.getenv("SCRAPERAPI_TIMEOUT", "70"))  # their docs say up to 60s per request
+SCRAPERAPI_RENDER_JS = _bool(os.getenv("SCRAPERAPI_RENDER_JS"), default=True)
+
 # Playwright (headless browser)
 PLAYWRIGHT_ENABLED = _bool(os.getenv("PLAYWRIGHT_ENABLED"), default=True)
 PLAYWRIGHT_TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_TIMEOUT_MS", "30000"))
