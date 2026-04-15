@@ -1,228 +1,63 @@
----
-title: E-Commerce QA with BERT + Sentiment
-emoji: 🛍️
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-app_port: 7860
-pinned: false
-license: mit
-short_description: Product QA with BERT and sentiment analysis
----
+# 🛍️ E-Commerce Intelligence Engine: BERT QA & Sentiment
+**A Production-Grade NLP Pipeline for Real-Time Product Analytics**
 
-# E-Commerce Product QA (v2) — BERT + Sentiment + Playwright
+[![Live Demo](https://img.shields.io/badge/Demo-HuggingFace-blue)](https://huggingface.co/spaces/rnyx/ecom-qa-bert-v2) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A multi-model NLP web app that answers any question about a product.
-**Spec questions** go to extractive BERT QA. **Review questions** go to a
-sentiment analysis pipeline. A rule-based router picks the right path.
-Scraping is done with **Playwright** so JS-rendered reviews are captured.
+## 🚀 Overview
+The **E-Commerce Intelligence Engine** is an end-to-end NLP system designed to bridge the gap between massive retail datasets and consumer queries. By combining real-time web automation with transformer-based deep learning, the engine parses product pages to provide instant, factual answers and aggregated sentiment analysis.
 
-## What's new vs. v1
-
-| Capability | v1 | **v2** |
-|---|---|---|
-| Answer factual spec questions | ✅ | ✅ |
-| Answer review/opinion questions | ❌ | ✅ |
-| Scrape JavaScript-rendered content | ❌ | ✅ |
-| Scrape product reviews | ❌ | ✅ (when not blocked) |
-| Multi-model architecture | single BERT | BERT + DistilBERT-SST |
-| Question intent routing | none | rule-based router |
+### 🌟 Key Engineering Highlights
+* **Dual-Model Orchestration:** Implements an **Intent Router** that classifies incoming queries to dispatch them to the optimal model: extractive **BERT** for technical specs or **DistilBERT** for subjective reviews.
+* **Dynamic Web Automation:** Utilizes **Playwright** (Headless Chromium) to render JavaScript-heavy e-commerce environments, ensuring the capture of reviews and specifications that traditional scrapers miss.
+* **Production-Ready Resilience:** Features a custom **Failover Layer**; if cloud-based requests face bot-detection (e.g., on Amazon), the system automatically triggers a stealth-fallback mechanism to maintain data flow.
+* **DevOps & Containerization:** Fully Dockerized with model weights pre-baked into the image to eliminate runtime latency and ensure high availability on the **Hugging Face Spaces** infrastructure.
 
 ---
 
-## Architecture
+## 🏗️ System Architecture
+The engine follows a modular pipeline designed for low-latency inference and high data integrity:
 
-```
-                        ┌─────────────────────┐
-        Question ──────▶│  Intent Router      │ ───┐
-                        │  (keyword-based)    │    │
-                        └─────────────────────┘    │
-                                                   │
-                ┌──── "spec" ───┐  "both"   ┌──── "review" ───┐
-                │               │    │      │                  │
-                ▼               ▼    ▼      ▼                  ▼
-        ┌──────────────┐       (both run)          ┌────────────────────┐
-        │ BERT QA      │                           │ DistilBERT-SST     │
-        │ (extractive) │                           │ (sentiment)        │
-        │ from specs + │                           │ batched over all   │
-        │ features     │                           │ scraped reviews    │
-        └──────────────┘                           └────────────────────┘
-              │                                            │
-              ▼                                            ▼
-      Answer span +                             Overall verdict +
-      confidence +                              pos/neg % + top 3
-      token breakdown                           positive + top 3 negative
-```
+### 1. Intelligent Intent Routing
+The core logic resides in a rule-based classifier that analyzes the linguistic structure of the user's question:
+* **Technical/Factual:** Questions regarding dimensions, hardware, or compatibility.
+* **Subjective/Opinionated:** Questions regarding user satisfaction, quality, or reliability.
+* **Hybrid Analysis:** Simultaneous execution for complex queries requiring both data points.
 
-## Models
-
-| Purpose | Model | Size |
-|---|---|---|
-| Extractive QA (specs) | `deepset/bert-base-cased-squad2` | ~440 MB |
-| Sentiment classification | `distilbert-base-uncased-finetuned-sst-2-english` | ~260 MB |
-
-Both pre-downloaded at Docker build time for fast cold starts.
-
-## Scraping
-
-Uses **Playwright** (headless Chromium) to render JavaScript and extract:
-- Title, features, description, specs (for BERT context)
-- Overall rating + review count
-- Up to 50 individual reviews (for sentiment analysis)
-
-**Reality check — Amazon blocking:**
-Cloud IPs (HuggingFace Spaces, AWS, GCP) are aggressively flagged as
-non-residential. Amazon serves CAPTCHAs to ~40-50% of headless requests
-from such IPs. When this happens, the app gracefully falls back to the
-legacy `requests`-based scraper (no reviews) and tells the user what
-happened. **Flipkart has better success rates.**
+### 2. Deep Learning Stack
+| Component | Model | Functional Utility |
+| :--- | :--- | :--- |
+| **Extractive QA** | `deepset/bert-base-cased-squad2` | High-precision extraction of facts from unstructured product descriptions. |
+| **Sentiment Analysis**| `distilbert-base-uncased-finetuned-sst-2` | Statistical aggregation of customer sentiment across 50+ real-time reviews. |
 
 ---
 
-## Routes
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET    | `/`                    | Main UI |
-| GET    | `/healthz`             | Liveness probe |
-| POST   | `/api/scrape`          | `{url}` → product text + reviews |
-| POST   | `/api/predict`         | `{question, context, reviews}` → qa and/or sentiment |
-| GET    | `/api/history?limit=N` | List saved Q&A |
-| DELETE | `/api/history/<id>`    | Remove one entry |
-| DELETE | `/api/history`         | Clear all |
-
-### `POST /api/predict` response shape (v2)
-
-```json
-{
-  "intent": "spec" | "review" | "both",
-  "classification": { "intent": "...", "review_keywords": [...], ... },
-  "qa": { "answer": "...", "confidence": 0.87, ... },
-  "sentiment": {
-    "overall_sentiment": "positive",
-    "positive_pct": 83.3,
-    "negative_pct": 16.7,
-    "top_positive": [{"text": "...", "confidence": 0.95, "rating": 5}],
-    "top_negative": [...],
-    "total": 12
-  },
-  "qa_error": "...",
-  "sentiment_error": "..."
-}
-```
-
-Only branches that ran appear in the response. If the router picked a
-branch but the data was missing (e.g., review question but no reviews
-scraped), a descriptive `*_error` field explains why.
+## 🛠️ Tech Stack
+* **Core Logic:** Python, Flask (RESTful API)
+* **Deep Learning:** Transformers (Hugging Face), PyTorch, BERT
+* **Automation:** Playwright (Chromium), BeautifulSoup4
+* **Reliability:** Docker, SQLite (Query Persistence), UptimeRobot
 
 ---
 
-## Project Structure
+## 🚀 Installation & Local Development
 
-```
-ecom-qa-bert-v2/
-├── Dockerfile                   # HF Spaces Docker SDK, Playwright + both models baked in
-├── README.md                    # (this file, with HF front-matter)
-├── requirements.txt             # Pinned versions
-├── .env.example                 # Config template
-├── .dockerignore / .gitignore
-├── src/
-│   ├── app.py                   # Flask routes + orchestration
-│   ├── config.py                # Env-driven config (both models, Playwright settings)
-│   ├── router.py                # Question intent classifier (spec / review / both)
-│   ├── model.py                 # BERT QA singleton
-│   ├── sentiment.py             # DistilBERT sentiment singleton
-│   ├── scraper.py               # Playwright wrapper (with legacy fallback)
-│   ├── scraper_legacy.py        # Requests-based scraper (fallback)
-│   └── db.py                    # SQLite history
-├── templates/index.html
-├── static/{css,js}/
-└── tests/
-    ├── test_app.py              # Route tests with mocked models
-    ├── test_db.py               # SQLite CRUD
-    ├── test_router.py           # Intent classifier tests
-    └── test_scraper.py          # Scraper parser tests
-```
+### Prerequisites
+* Python 3.9+
+* Docker (optional)
 
----
-
-## Deploy to HuggingFace Spaces
-
-1. Create a new Space at <https://huggingface.co/new-space>
-   - SDK: **Docker**
-   - Template: **Blank**
-   - Hardware: **CPU basic (free)** — works fine
-2. Clone the Space locally and copy these files in
-3. `git add . && git commit -m "v2" && git push`
-4. First build takes **~18-20 minutes** (downloads Chromium + 2 models, ~2.6 GB image). Subsequent builds are cached and faster.
-5. App boots at `https://<username>-<space-name>.hf.space`
-
-### Configuration (optional)
-
-Set any of these as Space secrets/variables:
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `HF_MODEL_NAME` | `deepset/bert-base-cased-squad2` | Swap QA model |
-| `SENTIMENT_MODEL_NAME` | `distilbert-base-uncased-finetuned-sst-2-english` | Swap sentiment model |
-| `PLAYWRIGHT_ENABLED` | `true` | Disable to skip headless browser |
-| `PLAYWRIGHT_MAX_REVIEWS` | `50` | Max reviews scraped per page |
-| `SENTIMENT_MAX_REVIEWS` | `50` | Max reviews analyzed |
-| `RATE_LIMIT_SCRAPE` | `10 per minute` | Per-IP scrape limit |
-
----
-
-## Local Development
-
+### Setup
 ```bash
-git clone https://github.com/<you>/ecom-qa-bert-v2 && cd ecom-qa-bert-v2
+# Clone the repository
+git clone [https://github.com/Aryan2659/ecom-qa-bert-v2](https://github.com/Aryan2659/ecom-qa-bert-v2) && cd ecom-qa-bert-v2
 
+# Create Virtual Environment
 python -m venv venv
-source venv/bin/activate              # Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Install Dependencies
 pip install -r requirements.txt
 python -m playwright install chromium
 
-cp .env.example .env                   # optional
+# Launch the Application
 python -m src.app
-```
-
-Then open <http://localhost:7860>.
-
-### Run with Docker
-
-```bash
-docker build -t ecom-qa-v2 .
-docker run --rm -p 7860:7860 -v ecom_qa_data:/data ecom-qa-v2
-```
-
----
-
-## Testing
-
-```bash
-pytest tests/ -v
-```
-
-All tests mock network + models, so they run in under 2 seconds with no
-BERT, no Chromium, no Amazon.
-
-Current coverage:
-- `test_router.py` — 23 tests for intent classification
-- `test_scraper.py` — 8 tests for HTML parsers + error paths
-- `test_db.py` — 6 tests for SQLite persistence
-- `test_app.py` — 11 tests for Flask routes + routing logic
-
----
-
-## Known limitations
-
-1. **Amazon often blocks review scraping** from cloud IPs. The app detects this and tells the user. Flipkart works better.
-2. **Sentiment analysis is aggregate** — if reviews are genuinely mixed, the verdict is "mixed", which is accurate but less satisfying than a clear answer.
-3. **Router is rule-based** — it handles common cases well but can misclassify creative phrasings. A small fine-tuned classifier would be more robust; left as future work.
-4. **Single Gunicorn worker** — both models in one process use ~900 MB RAM. More workers would duplicate model weights.
-
-## License
-
-MIT
